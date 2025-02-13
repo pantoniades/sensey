@@ -1,0 +1,17 @@
+# Ignore CSV logs
+sensey_server/data/*.csv
+
+# Ignore virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore IDE files
+.vscode/
+*.swp
+
