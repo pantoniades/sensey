@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Sensor Dashboard</title>
+</head>
+<body>
+    <h1>Select a Client</h1>
+<form action="" onsubmit="event.preventDefault(); window.location='/charts/' + document.getElementById('client_id').value;">
+        <label for="client_id">Client:</label>
+        <select name="client_id" id="client_id">
+            {% for client in clients %}
+                <option value="{{ client }}">{{ client }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">View Charts</button>
+    </form>
+</body>
+</html>
+
+
