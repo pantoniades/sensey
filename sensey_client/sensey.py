@@ -2,6 +2,7 @@ import asyncio
 import csv
 import logging
 import requests
+import configparser
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import List, Dict, Any
@@ -49,18 +50,24 @@ class CSVLogger:
             interval: Logging interval in seconds (default: 180s).
             decimal_places: Number of decimal places for floats in the CSV output.
         """
+        cfg = configparser.ConfigParser()
+        cfg.read('sensey.ini')
+        self.sensey_server = "192.168.86.39:5000"
         self.sensors = sensors
         self.interval = interval
         self.decimal_places = decimal_places
+        self.host = gethostname()
         self.filename = self._generate_filename()
+        if 'client' in cfg:
+            self.interval = int( cfg['client']['poll_interval'] )
+            self.server_url = cfg['client']['server_url']
 
     def _generate_filename(self) -> str:
         """Generates a weekly CSV filename based on the current date."""
 
         datestr = datetime.now().strftime("%Y%m%d")
-        host = gethostname()
 
-        return f"{datestr}_{host}_sensey_output.csv"
+        return f"{datestr}_{self.host}_sensey_output.csv"
 
     async def log_data(self):
         """Periodically logs sensor data to a CSV file."""
@@ -118,10 +125,8 @@ class CSVLogger:
 
     def _send_data( self, data: Dict[str, Any] ):
         """Sends data to a Sensey server """
-        sensey_server = "192.168.86.39:5000"
-        hostname = gethostname()
-
-        url = f"http://{sensey_server}/data/{hostname}"  # Use hostname to identify the client
+        
+        url = f"http://{self.sensey_server}/data/{self.host}"  # Use hostname to identify the client
 
         try:
             response = requests.post(url, json=data, timeout=5)
