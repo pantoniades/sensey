@@ -41,14 +41,28 @@ class SenseHatReader( EnvironmentSensor):
         
     def poll(self):
         return TempHumidityEvent( self.sense_hat.get_temperature(), self.sense_hat.get_humidity() )
+    
+class SenseHatLightReader( EnvironmentSensor ):
+    def __init__(self, sense_hat:SenseHat ):
+        super().__init__()
+        self.sense_hat = sense_hat
+
+    @property
+    def sensor_names(self):
+        return["brightness"]
+    
+    def poll(self):
+        return LightEvent( self.sense_hat.color.clear_raw )
         
 
 async def main():
     
     sensors = []
+    sense_hat = SenseHat()
     
     # Initialize sensors
-    sensors.append( SenseHatReader(SenseHat()) )
+    sensors.append( SenseHatReader( sense_hat ) )
+    sensors.append( SenseHatLightReader( sense_hat ) )
 
     # Initialize logger
     logger = CSVLogger(sensors)
