@@ -58,7 +58,7 @@ def display_charts_for_client(client_id):
     <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
     """.format(client_id)
 
-    for i, column in enumerate(df.columns):
+    for i, column in enumerate(df.select_dtypes(include=['number']).columns):
         if column != "timestamp":
             display_name = column.replace("_", " ").title()  # Convert to readable format
 

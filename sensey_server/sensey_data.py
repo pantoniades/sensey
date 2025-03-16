@@ -24,6 +24,9 @@ def store_data(client_id: str, sensor_data: dict):
     os.makedirs(DATA_DIR, exist_ok=True)
     file_path = os.path.join(DATA_DIR, f"{client_id}.csv")
 
+    if 'readings' in sensor_data:
+        sensor_data = flatten_dict( sensor_data )
+
     df = pd.DataFrame([sensor_data])
 
     # Write header only if the file is new
@@ -44,9 +47,22 @@ def get_latest_data(client_id: str, days: int | None = 3) -> pd.DataFrame:
         df = df.sort_values("timestamp")
     
     if days is not None:
-                cutoff_date = datetime.now() - timedelta(days=days)
-                df = df[df["timestamp"] >= cutoff_date]
-                logging.info( f"Returning data for last {days} days of {client_id} sensors" )
+            cutoff_date = datetime.now() - timedelta(days=days)
+            df = df[df["timestamp"] >= cutoff_date]
+            logging.info( f"Returning data for last {days} days of {client_id} sensors" )
     
     return df
+
+def flatten_dict(d: dict )->dict:
+    """
+    Flattens a dictionary by unpacking any nested dictionaries.
+    """
+    flattened = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            for inner_k, inner_v in v.items():
+                flattened[f"{inner_k}"] = inner_v
+        else:
+            flattened[k] = v
+    return flattened
 
