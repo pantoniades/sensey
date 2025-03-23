@@ -119,6 +119,9 @@ class MoistureSensor( EnvironmentSensor):
         self.spi = spidev.SpiDev(0, spi_ch)
         self.spi.max_speed_hz = 1200000
 
+    def setLevels( self, dry:int, wet:int ):
+        self.dry_reading = dry
+        self.wet_reading = wet    
 
     @property
     def sensor_names(self):
@@ -161,7 +164,7 @@ class MoistureSensor( EnvironmentSensor):
 
         # Last bit (0) is not part of ADC value, shift to remove it
         adc = adc >> 1
-        logging.info( f"Current adc reading is {adc}" )
+        #logging.info( f"Current adc reading is {adc}" )
         
         # calculate moisture % from adc
         percentage = 100 * ((adc - self.dry_reading) / (self.wet_reading - self.dry_reading))

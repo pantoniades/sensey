@@ -2,11 +2,15 @@ import asyncio
 import csv
 import logging
 import requests
+import json
+import os
 import configparser
 from abc import ABC, abstractmethod
+from collections import deque
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Deque
 from socket import gethostname
+from time import sleep
 
 # Configure logging
 logging.basicConfig(
@@ -58,9 +62,19 @@ class CSVLogger:
         self.decimal_places = decimal_places
         self.host = gethostname()
         self.filename = self._generate_filename()
+        self.cache_file = "./sensey_cache.json"
+        self.INITIAL_RETRY_DELAY = 1
+        self.MAX_RETRY_DELAY = 8
+
         if 'client' in cfg:
             self.interval = int( cfg['client']['poll_interval'] )
-            self.server_url = cfg['client']['server_url']
+            self.sensey_server = cfg['client']['sensey_server']
+            self.cache_file = cfg['client']['cache_file']
+            self.config = cfg["client"]
+            logging.info( f"Loaded config file with keys {self.config.keys()}")
+        
+        self.cache = self._load_cache()
+        self.server_url = f"http://{self.sensey_server}/data/{self.host}"
 
     def _generate_filename(self) -> str:
         """Generates a weekly CSV filename based on the current date."""
@@ -69,8 +83,31 @@ class CSVLogger:
 
         return f"{datestr}_{self.host}_sensey_output.csv"
 
+    def _save_cache(self):
+        """Save unsent data cache to a JSON file."""
+        try:
+            with open( self.cache_file, "w") as f:
+                json.dump(list(self.cache), f)
+        except OSError as e:
+            logging.error(f"Failed to save unsent data cache: {e}")
+
+    def _load_cache(self) -> Deque[Dict[str, Any]]:
+        """Load cached unsent data from a JSON file."""
+        cache = deque()
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, "r") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        cache = deque(data)
+            except (json.JSONDecodeError, OSError):
+                logging.error("Failed to load unsent data cache. Resetting cache.")
+        else:
+            logging.info( f"No cache file found at {self.cache_file}")
+        return cache
+    
     async def log_data(self):
-        """Periodically logs sensor data to a CSV file."""
+        """Periodically sends data to a sensey_server and logs sensor data to a CSV file."""
         while True:
             try:
                 logging.info("Polling sensors for data...")
@@ -125,16 +162,31 @@ class CSVLogger:
 
     def _send_data( self, data: Dict[str, Any] ):
         """Sends data to a Sensey server """
-        
-        url = f"http://{self.sensey_server}/data/{self.host}"  # Use hostname to identify the client
+        self.cache.append( data )
+        self._save_cache()
+        retry_delay = self.INITIAL_RETRY_DELAY
 
-        try:
-            response = requests.post(url, json=data, timeout=5)
-            if response.status_code == 200:
-                logging.info("Data sent successfully.")
-            else:
-                logging.error(f"Server returned an error: {response.status_code} - {response.text}")
-                # raise exception
-        except requests.RequestException as e:
-            print(f"Failed to send data: {e}")
+        while self.cache:
+            current_data = self.cache.popleft()
+            success = True
+            try:
+                response = requests.post( self.server_url, json=data, timeout=5)
+                if response.status_code == 200:
+                    logging.info("Data sent successfully.")
+                    retry_delay = self.INITIAL_RETRY_DELAY
+                else:
+                    logging.error(f"Server returned an error: {response.status_code} - {response.text}")
+                    success = False
+            except requests.RequestException as e:
+                print(f"Failed to send data: {e}")
+                success = False
+            finally:
+                if success is False:
+                    self.cache.appendleft(current_data)
+                    logging.warning(f"Unsuccessful send, sleeping for {retry_delay} seconds before trying again")
+                    sleep(retry_delay)
+                    retry_delay = max( retry_delay*2, self.MAX_RETRY_DELAY )
+            self._save_cache()
+            if retry_delay == self.MAX_RETRY_DELAY:
+                break 
 
