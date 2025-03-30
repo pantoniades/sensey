@@ -67,11 +67,12 @@ class CSVLogger:
         self.MAX_RETRY_DELAY = 8
 
         if 'client' in cfg:
-            self.interval = int( cfg['client']['poll_interval'] )
-            self.sensey_server = cfg['client']['sensey_server']
-            self.cache_file = cfg['client']['cache_file']
+            #self.sensey_server = cfg['client']['sensey_server']
+            #self.cache_file = cfg['client']['cache_file']
             self.config = cfg["client"]
-            logging.info( f"Loaded config file with keys {self.config.keys()}")
+            self.interval = self.config.getint( 'poll_interval', 300)
+            self.cache_file = self.config.get( 'cache_file', "./sensey_cache.json" )
+            logging.info( f"Loaded config file with keys {[key for key in self.config.keys()]}")
         
         self.cache = self._load_cache()
         self.server_url = f"http://{self.sensey_server}/data/{self.host}"
@@ -115,7 +116,7 @@ class CSVLogger:
                 self._write_to_csv(data)
                 logging.info("Data logged successfully.")
                 self._send_data( data )
-                logging.info("Data sent to sensey server")
+                #logging.info("Data sent to sensey server")
             except Exception as e:
                 logging.error(f"Error logging data: {e}", exc_info=True)
             await asyncio.sleep(self.interval)
@@ -170,7 +171,7 @@ class CSVLogger:
             current_data = self.cache.popleft()
             success = True
             try:
-                response = requests.post( self.server_url, json=data, timeout=5)
+                response = requests.post( self.server_url, json=current_data, timeout=5)
                 if response.status_code == 200:
                     logging.info("Data sent successfully.")
                     retry_delay = self.INITIAL_RETRY_DELAY
@@ -185,8 +186,9 @@ class CSVLogger:
                     self.cache.appendleft(current_data)
                     logging.warning(f"Unsuccessful send, sleeping for {retry_delay} seconds before trying again")
                     sleep(retry_delay)
-                    retry_delay = max( retry_delay*2, self.MAX_RETRY_DELAY )
+                    retry_delay = min( retry_delay*2, self.MAX_RETRY_DELAY )
             self._save_cache()
             if retry_delay == self.MAX_RETRY_DELAY:
+                logging.error(f"Exiting, reached max retry of {self.MAX_RETRY_DELAY}")
                 break 
 
