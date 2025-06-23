@@ -44,23 +44,19 @@ def index():
 
 @app.route("/charts/<client_id>")
 def display_charts_for_client(client_id):
-    """Generate and display charts for a given client with breadcrumb navigation and refined styling."""
-    df = sensey_data.get_latest_data(client_id)
+    """Generate and display charts for a given client with time range selection."""
+    time_range = request.args.get('range', '3d')
+    df = sensey_data.get_latest_data(client_id, time_range)
     if df is None or df.empty:
-        return f"<h2>No data available for {client_id}.</h2>"
+        return render_template("charts.html", client_id=client_id, error="No data available", time_range=time_range)
 
-    colors = px.colors.qualitative.Set2  # Use a visually distinct color palette
-    chart_html = """
-    <div style="margin-bottom: 20px;">
-        <a href='/' style='text-decoration: none; font-size: 18px; color: #007bff;'>⬅ Home</a>
-    </div>
-    <h1 style='text-align: center; font-family: Arial, sans-serif;'>Sensor Data for {}</h1>
-    <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
-    """.format(client_id)
-
+    # Generate chart data for template
+    charts = []
+    colors = px.colors.qualitative.Set2
+    
     for i, column in enumerate(df.select_dtypes(include=['number']).columns):
         if column != "timestamp":
-            display_name = column.replace("_", " ").title()  # Convert to readable format
+            display_name = column.replace("_", " ").title()
 
             # Compute dynamic y-axis range
             y_min, y_max = df[column].min(), df[column].max()
@@ -76,15 +72,17 @@ def display_charts_for_client(client_id):
                               xaxis_title="Timestamp",
                               yaxis_title=display_name,
                               yaxis=dict(range=y_range), 
-                              template="plotly_dark",  # Use dark theme
+                              template="plotly_dark",
                               height=350, width=500,
                               font=dict(family="Arial, sans-serif", size=14),
                               margin=dict(l=30, r=30, t=50, b=50))
 
-            chart_html += f'<div style="flex: 1; min-width: 500px;">{fig.to_html(full_html=False)}</div>'
+            charts.append({
+                'name': display_name,
+                'html': fig.to_html(full_html=False, div_id=f"chart-{column}")
+            })
 
-    chart_html += '</div>'
-    return chart_html
+    return render_template("charts.html", client_id=client_id, charts=charts, time_range=time_range)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

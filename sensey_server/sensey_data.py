@@ -3,6 +3,8 @@ import os
 import glob
 import logging
 from datetime import datetime, timedelta
+from functools import lru_cache
+import hashlib
 
 
 DATA_DIR = "data"  # Directory where CSV files are stored
@@ -33,25 +35,67 @@ def store_data(client_id: str, sensor_data: dict):
     write_header = not os.path.exists(file_path)
     df.to_csv(file_path, mode="a", index=False, header=write_header)
 
-def get_latest_data(client_id: str, days: int | None = 3) -> pd.DataFrame:
-    """Read the latest week's worth of data for a client."""
+def _get_file_hash(file_path: str) -> str:
+    """Get hash of file modification time for cache key."""
+    if not os.path.exists(file_path):
+        return "none"
+    return str(int(os.path.getmtime(file_path)))
+
+@lru_cache(maxsize=32)
+def _cached_read_csv(file_path: str, file_hash: str) -> pd.DataFrame:
+    """Cached CSV reading function."""
+    if not os.path.exists(file_path):
+        return None
+    return pd.read_csv(file_path)
+
+def get_latest_data(client_id: str, time_range: str = "3d") -> pd.DataFrame:
+    """Read data for a client with flexible time range support.
+    
+    Args:
+        client_id: Client identifier
+        time_range: Time range in format like '1h', '6h', '1d', '3d', '7d', 'all'
+    """
     file_path = os.path.join(DATA_DIR, f"{client_id}.csv")
     
     if not os.path.exists(file_path):
         return None
 
-    df = pd.read_csv(file_path)
+    # Use cached reading with file modification time as cache key
+    file_hash = _get_file_hash(file_path)
+    df = _cached_read_csv(file_path, file_hash)
+    
+    if df is None or df.empty:
+        return None
     
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df = df.sort_values("timestamp")
     
-    if days is not None:
-            cutoff_date = datetime.now() - timedelta(days=days)
+    # Parse time range and filter data
+    if time_range != "all":
+        cutoff_date = _parse_time_range(time_range)
+        if cutoff_date:
             df = df[df["timestamp"] >= cutoff_date]
-            logging.info( f"Returning data for last {days} days of {client_id} sensors" )
+            logging.info(f"Returning data for last {time_range} of {client_id} sensors")
     
     return df
+
+def _parse_time_range(time_range: str) -> datetime:
+    """Parse time range string and return cutoff datetime."""
+    now = datetime.now()
+    
+    if time_range.endswith('h'):
+        hours = int(time_range[:-1])
+        return now - timedelta(hours=hours)
+    elif time_range.endswith('d'):
+        days = int(time_range[:-1])
+        return now - timedelta(days=days)
+    elif time_range.endswith('w'):
+        weeks = int(time_range[:-1])
+        return now - timedelta(weeks=weeks)
+    else:
+        # Default to 3 days if invalid format
+        return now - timedelta(days=3)
 
 def flatten_dict(d: dict )->dict:
     """
