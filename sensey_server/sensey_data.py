@@ -4,7 +4,7 @@ import glob
 import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
-import hashlib
+
 
 
 DATA_DIR = "data"  # Directory where CSV files are stored

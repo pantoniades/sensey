@@ -85,5 +85,7 @@ def display_charts_for_client(client_id):
     return render_template("charts.html", client_id=client_id, charts=charts, time_range=time_range)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Disable debug in production for security
+    debug_mode = os.environ.get('SENSEY_DEBUG', 'False').lower() == 'true'
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
 
