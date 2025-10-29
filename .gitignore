@@ -3,9 +3,20 @@ sensey_server/data/*.csv
 
 # Ignore virtual environment
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
+sensey_server/bin/
+sensey_server/lib/
+sensey_server/lib64
+sensey_server/include/
+sensey_server/share/
+sensey_server/pyvenv.cfg
+
+# Ignore configuration files (use .example files as templates)
+sensey_server/sensey.ini
+sensey_client/sensey.ini
 
 # Ignore logs
 logs/
@@ -14,4 +25,8 @@ logs/
 # Ignore IDE files
 .vscode/
 *.swp
+.ipynb_checkpoints/
+
+# Ignore Jupyter notebooks
+*.ipynb
 

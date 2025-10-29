@@ -1,0 +1,29 @@
+# Sensey Server Configuration
+# Copy this file to sensey.ini and configure for your environment
+
+[storage]
+# Storage backend type: csv or mysql
+# csv: Simple file-based storage (no additional dependencies)
+# mysql: Database storage (requires mysql-connector-python and MySQL 8.4+)
+backend = csv
+
+[csv]
+# Directory for storing CSV data files
+# Can be relative (to sensey_server directory) or absolute path
+data_dir = data
+
+[mysql]
+# MySQL 8.4+ connection parameters (only used if backend=mysql)
+# The server uses a hybrid schema:
+#   - temperature and humidity stored as dedicated columns (fast queries)
+#   - other measurements stored in JSON column (flexible schema)
+
+host = localhost
+port = 3306
+user = sensey
+password =
+database = sensey
+
+# Connection pool size (number of persistent connections)
+# Adjust based on expected concurrent client connections
+pool_size = 5

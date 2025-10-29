@@ -2,6 +2,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
+import atexit
 from flask import Flask, jsonify, request, render_template
 import logging
 import sensey_data  # Data handling module
@@ -11,6 +12,43 @@ app = Flask(__name__)
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# Initialize storage backend from configuration
+def initialize_storage():
+    """Initialize storage backend from sensey.ini configuration file."""
+    try:
+        from storage import create_storage_from_config
+        from config import ConfigurationError
+
+        storage = create_storage_from_config()
+        storage.initialize()
+        sensey_data.set_storage(storage)
+
+        logger.info("Storage backend initialized successfully")
+
+    except ConfigurationError as e:
+        logger.error(f"Configuration error: {e}")
+        logger.error("Application cannot start without valid configuration")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to initialize storage: {e}")
+        raise
+
+# Initialize storage on application startup
+try:
+    initialize_storage()
+except Exception as e:
+    logger.critical(f"FATAL: Storage initialization failed: {e}")
+    logger.critical("Please check sensey.ini configuration and try again")
+    # Let the exception propagate - app should not start without storage
+    raise
+
+# Register shutdown handler to close storage cleanly
+@atexit.register
+def shutdown_storage():
+    """Close storage backend on application shutdown."""
+    logger.info("Application shutting down, closing storage...")
+    sensey_data.close_storage()
 
 @app.route("/data/<client_id>", methods=["POST"])
 def receive_data(client_id):
