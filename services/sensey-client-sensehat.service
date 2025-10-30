@@ -1,0 +1,26 @@
+[Unit]
+Description=Sensey SenseHat Client - Raspberry Pi Sense HAT data collector
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/sensey/sensey_client
+ExecStart=/usr/bin/python3 pi_sense_hat_sensey.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sensey-client-sensehat
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/pi/sensey/sensey_client
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

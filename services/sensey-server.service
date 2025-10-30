@@ -1,0 +1,27 @@
+[Unit]
+Description=Sensey Server - Distributed sensor monitoring web server
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/sensey/sensey_server
+Environment=PATH=/home/pi/sensey/sensey_server/bin
+ExecStart=/home/pi/sensey/sensey_server/bin/python app.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sensey-server
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/pi/sensey/sensey_server/data
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,18 +1,20 @@
-# Ignore CSV logs
+# Ignore CSV data files
 sensey_server/data/*.csv
 
-# Ignore virtual environment
+# Ignore virtual environments
+# Development: Root .venv/ for unified dev environment
+# Production: Server/client venvs created by install scripts
 venv/
 .venv/
+*/bin/
+*/lib/
+*/lib64
+*/include/
+*/share/
+*/pyvenv.cfg
 __pycache__/
 *.pyc
 *.pyo
-sensey_server/bin/
-sensey_server/lib/
-sensey_server/lib64
-sensey_server/include/
-sensey_server/share/
-sensey_server/pyvenv.cfg
 
 # Ignore configuration files (use .example files as templates)
 sensey_server/sensey.ini
@@ -22,11 +24,19 @@ sensey_client/sensey.ini
 logs/
 *.log
 
+# Ignore test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+*.cover
+
 # Ignore IDE files
 .vscode/
+.idea/
 *.swp
+*.swo
 .ipynb_checkpoints/
 
-# Ignore Jupyter notebooks
+# Ignore Jupyter notebooks (working files)
 *.ipynb
 

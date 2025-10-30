@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor Charts - {{ client_id }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .breadcrumb {
+            font-size: 18px;
+        }
+        .breadcrumb a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .time-selector {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .time-btn {
+            padding: 8px 16px;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .time-btn:hover {
+            background-color: #555;
+        }
+        .time-btn.active {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        h1 {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .charts-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .chart-wrapper {
+            flex: 1;
+            min-width: 500px;
+            max-width: 600px;
+        }
+        .error-message {
+            text-align: center;
+            color: #ff6b6b;
+            font-size: 18px;
+            margin: 40px 0;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            color: #888;
+        }
+        @media (max-width: 768px) {
+            .chart-wrapper {
+                min-width: 100%;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="breadcrumb">
+            <a href="/">⬅ Home</a>
+        </div>
+        <div class="time-selector">
+            <a href="?range=1h" class="time-btn {% if time_range == '1h' %}active{% endif %}">1 Hour</a>
+            <a href="?range=6h" class="time-btn {% if time_range == '6h' %}active{% endif %}">6 Hours</a>
+            <a href="?range=1d" class="time-btn {% if time_range == '1d' %}active{% endif %}">1 Day</a>
+            <a href="?range=3d" class="time-btn {% if time_range == '3d' %}active{% endif %}">3 Days</a>
+            <a href="?range=7d" class="time-btn {% if time_range == '7d' %}active{% endif %}">7 Days</a>
+            <a href="?range=all" class="time-btn {% if time_range == 'all' %}active{% endif %}">All Data</a>
+        </div>
+    </div>
+
+    <h1>Sensor Data for {{ client_id }}</h1>
+
+    {% if error %}
+        <div class="error-message">{{ error }}</div>
+    {% else %}
+        <div class="charts-container" id="charts-container">
+            {% for chart in charts %}
+                <div class="chart-wrapper">
+                    {{ chart.html|safe }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <script>
+        // Add loading indicator for time range changes
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                // Don't show loading if it's already active
+                if (this.classList.contains('active')) {
+                    e.preventDefault();
+                    return;
+                }
+                
+                // Show loading
+                const container = document.getElementById('charts-container');
+                if (container) {
+                    container.innerHTML = '<div class="loading">Loading charts...</div>';
+                }
+            });
+        });
+
+        // Auto-refresh functionality (optional)
+        function autoRefresh() {
+            if (window.location.search.includes('auto=true')) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 30000); // Refresh every 30 seconds
+            }
+        }
+        
+        // Add refresh button functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            autoRefresh();
+        });
+    </script>
+</body>
+</html>

@@ -1,5 +1,8 @@
 #!/bin/bash
 # Sensey Server Installation Script
+#
+# This script is for PRODUCTION deployment on Raspberry Pi.
+# For DEVELOPMENT, use the root .venv/ environment instead.
 
 set -e
 

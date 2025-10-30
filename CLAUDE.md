@@ -10,24 +10,57 @@ Sensey is a distributed sensor monitoring system with two main components:
 
 ## Commands
 
-### Server Setup and Running
+### Development Setup (Unified Environment)
+
+For development work on both server and client:
+
 ```bash
-cd sensey_server
+# From project root
+cd /path/to/sensey
 
-# Copy and configure storage backend
-cp sensey.ini.example sensey.ini
-# Edit sensey.ini to choose CSV or MySQL storage
+# Create virtual environment (if not exists)
+python3 -m venv .venv
 
-# Install dependencies
-pip install -r requirements.txt
+# Activate virtual environment
+source .venv/bin/activate
+
+# Install server dependencies
+pip install -r sensey_server/requirements.txt
+
+# Install client dependencies (when available)
+# pip install -r sensey_client/requirements.txt
+
+# Copy and configure server
+cp sensey_server/sensey.ini.example sensey_server/sensey.ini
+# Edit sensey_server/sensey.ini to choose CSV or MySQL storage
 
 # For MySQL storage, also install:
 # pip install mysql-connector-python
 
+# Run tests (from project root)
+pytest
+
 # Run server
+cd sensey_server
 python app.py
 ```
+
 Server runs on http://0.0.0.0:5000
+
+### Production Deployment (Raspberry Pi)
+
+For production deployment with isolated environments:
+
+```bash
+# Server installation
+./install-server.sh
+sudo systemctl start sensey-server
+
+# Client installation
+./install-client.sh --garden  # or --sensehat
+```
+
+Production installs create isolated virtual environments in `/home/pi/sensey/`.
 
 ### Client Setup and Running
 ```bash
