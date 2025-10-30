@@ -1,3 +1,36 @@
+"""
+Sensey Server - Flask Web Application
+
+This module provides the main Flask web server for the Sensey distributed sensor
+monitoring system. It receives sensor data from remote Raspberry Pi clients,
+stores it using a pluggable storage backend, and provides web-based visualization.
+
+Routes:
+    POST /data/<client_id>  - Receive sensor data from clients
+    GET  /                  - Dashboard with client selector
+    GET  /charts/<client_id> - Interactive charts for a specific client
+
+Storage:
+    The application uses a pluggable storage backend (CSV or MySQL) configured
+    via sensey.ini. The storage is initialized at startup and cleanly closed
+    on shutdown.
+
+Usage:
+    # Development (with .venv activated)
+    python app.py
+
+    # Production (via systemd)
+    systemctl start sensey-server
+
+Configuration:
+    sensey.ini must exist in the same directory. See sensey.ini.example for
+    configuration options.
+
+Environment Variables:
+    SENSEY_DEBUG: Set to 'true' to enable Flask debug mode (default: false)
+    SENSEY_CONFIG_PATH: Override path to sensey.ini (optional)
+"""
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -82,45 +115,83 @@ def index():
 
 @app.route("/charts/<client_id>")
 def display_charts_for_client(client_id):
-    """Generate and display charts for a given client with time range selection."""
+    """
+    Generate and display interactive charts for a specific client.
+
+    Creates one Plotly chart for each numeric column in the client's sensor data.
+    Charts are displayed in a responsive grid layout with time range filtering.
+
+    Args:
+        client_id (str): Unique identifier for the client (typically hostname)
+
+    Query Parameters:
+        range (str): Time range for data (1h, 6h, 1d, 3d, 7d, all). Default: 3d
+
+    Returns:
+        Rendered HTML template with charts or error message
+
+    Chart Features:
+        - Dynamic y-axis scaling with 25% padding for better visibility
+        - Dark theme for reduced eye strain
+        - Responsive sizing for different screen sizes
+        - Unique colors for each measurement type
+    """
+    # Get time range from query parameter (default: 3 days)
     time_range = request.args.get('range', '3d')
+
+    # Fetch sensor data from storage backend
     df = sensey_data.get_latest_data(client_id, time_range)
     if df is None or df.empty:
-        return render_template("charts.html", client_id=client_id, error="No data available", time_range=time_range)
+        return render_template("charts.html", client_id=client_id,
+                             error="No data available", time_range=time_range)
 
-    # Generate chart data for template
+    # Generate one chart for each numeric column (temperature, humidity, etc.)
     charts = []
-    colors = px.colors.qualitative.Set2
-    
+    colors = px.colors.qualitative.Set2  # Color palette for visual distinction
+
+    # Iterate through all numeric columns (excluding timestamp)
     for i, column in enumerate(df.select_dtypes(include=['number']).columns):
         if column != "timestamp":
+            # Convert column name to human-readable format (e.g., "soil_moisture" -> "Soil Moisture")
             display_name = column.replace("_", " ").title()
 
-            # Compute dynamic y-axis range
+            # Calculate dynamic y-axis range with 25% padding above and below data range
+            # This prevents data points from touching the chart edges
             y_min, y_max = df[column].min(), df[column].max()
             y_range_padding = (y_max - y_min) * 0.25 if y_max != y_min else y_max * 0.25
             y_range = [y_min - y_range_padding, y_max + y_range_padding]
 
-            # Create line chart with a unique color
+            # Create Plotly line chart with markers for data points
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df["timestamp"], y=df[column], 
-                                     mode='lines+markers', name=display_name, 
-                                     line=dict(color=colors[i % len(colors)])))
-            fig.update_layout(title=f"{display_name} Over Time",
-                              xaxis_title="Timestamp",
-                              yaxis_title=display_name,
-                              yaxis=dict(range=y_range), 
-                              template="plotly_dark",
-                              height=350, width=500,
-                              font=dict(family="Arial, sans-serif", size=14),
-                              margin=dict(l=30, r=30, t=50, b=50))
+            fig.add_trace(go.Scatter(
+                x=df["timestamp"],
+                y=df[column],
+                mode='lines+markers',  # Show both line and individual data points
+                name=display_name,
+                line=dict(color=colors[i % len(colors)])  # Cycle through color palette
+            ))
 
+            # Configure chart layout and styling
+            fig.update_layout(
+                title=f"{display_name} Over Time",
+                xaxis_title="Timestamp",
+                yaxis_title=display_name,
+                yaxis=dict(range=y_range),  # Apply calculated range
+                template="plotly_dark",      # Dark theme
+                height=350,
+                width=500,
+                font=dict(family="Arial, sans-serif", size=14),
+                margin=dict(l=30, r=30, t=50, b=50)  # Compact margins
+            )
+
+            # Convert chart to HTML and add to collection
             charts.append({
                 'name': display_name,
                 'html': fig.to_html(full_html=False, div_id=f"chart-{column}")
             })
 
-    return render_template("charts.html", client_id=client_id, charts=charts, time_range=time_range)
+    return render_template("charts.html", client_id=client_id,
+                         charts=charts, time_range=time_range)
 
 if __name__ == "__main__":
     # Disable debug in production for security

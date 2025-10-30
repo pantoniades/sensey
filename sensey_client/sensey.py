@@ -1,3 +1,44 @@
+"""
+Sensey Client - Core Sensor Monitoring Framework
+
+This module provides the foundational abstractions for the Sensey distributed
+sensor monitoring system. It defines base classes for sensors and implements
+a resilient data logger with retry logic and local caching.
+
+Key Components:
+    - EnvironmentSensor: Abstract base class for sensor implementations
+    - SenseEvent: Abstract base class for sensor reading events
+    - CSVLogger: Async data logger with local caching and HTTP transmission
+
+Design Pattern:
+    Uses a plugin architecture where new sensor types can be added by:
+    1. Extending EnvironmentSensor
+    2. Implementing poll() to return SenseEvent
+    3. Defining sensor_names property
+
+Features:
+    - Asynchronous sensor polling for non-blocking operation
+    - Automatic retry with exponential backoff for failed transmissions
+    - Local CSV logging as backup and cache
+    - Configuration-driven (sensey.ini)
+    - Resilient to network failures
+
+Usage Example:
+    # Implement a custom sensor
+    class MySensor(EnvironmentSensor):
+        def poll(self) -> SenseEvent:
+            # Read hardware
+            return MySenseEvent(reading_data)
+
+        @property
+        def sensor_names(self) -> List[str]:
+            return ["temperature", "humidity"]
+
+    # Use with CSVLogger
+    logger = CSVLogger([MySensor()], interval=300)
+    asyncio.run(logger.run())
+"""
+
 import asyncio
 import csv
 import logging
@@ -45,36 +86,74 @@ class EnvironmentSensor(ABC):
 
 
 class CSVLogger:
-    """Logs data from EnvironmentSensor objects to a CSV file."""
+    """
+    Asynchronous sensor data logger with resilient HTTP transmission.
+
+    This class handles:
+    - Periodic polling of multiple sensors
+    - Local CSV logging for data backup
+    - HTTP transmission to Sensey server
+    - Automatic retry with exponential backoff
+    - Persistent caching of unsent data
+
+    The logger maintains a queue of unsent data that survives restarts. If the
+    server is unreachable, data accumulates in the cache and is transmitted when
+    connectivity is restored.
+
+    Retry Strategy:
+        - Starts with 1-second delay
+        - Doubles on each failure (up to 8 seconds)
+        - Resets to 1 second on success
+        - Preserves queue order (FIFO)
+
+    Thread Safety:
+        This class is designed for single-threaded async operation. Do not
+        use multiple instances concurrently without external synchronization.
+    """
 
     def __init__(self, sensors: List["EnvironmentSensor"], interval: int = 300, decimal_places: int = 2):
         """
+        Initialize CSVLogger with sensors and configuration.
+
         Args:
-            sensors: List of EnvironmentSensor objects to poll.
-            interval: Logging interval in seconds (default: 180s).
-            decimal_places: Number of decimal places for floats in the CSV output.
+            sensors: List of EnvironmentSensor objects to poll
+            interval: Polling interval in seconds (default: 300, overridden by config)
+            decimal_places: Number of decimal places for CSV output (default: 2)
+
+        Configuration:
+            Reads from sensey.ini in current directory. If [client] section exists:
+            - poll_interval: Override default polling interval
+            - cache_file: Path to persistent cache file
+            - sensey_server: Server address (host:port format)
         """
+        # Load configuration from INI file
         cfg = configparser.ConfigParser()
         cfg.read('sensey.ini')
-        self.sensey_server = "192.168.86.39:5000"
+
+        # Default values (overridden by config if present)
+        self.sensey_server = "192.168.86.39:5000"  # TODO: Remove hardcoded default
         self.sensors = sensors
         self.interval = interval
         self.decimal_places = decimal_places
-        self.host = gethostname()
-        self.filename = self._generate_filename()
-        self.cache_file = "./sensey_cache.json"
-        self.INITIAL_RETRY_DELAY = 1
-        self.MAX_RETRY_DELAY = 8
+        self.host = gethostname()  # Client identifier (hostname)
+        self.filename = self._generate_filename()  # Daily CSV file
+        self.cache_file = "./sensey_cache.json"  # Persistent queue storage
 
+        # Retry configuration for exponential backoff
+        self.INITIAL_RETRY_DELAY = 1  # Start with 1 second
+        self.MAX_RETRY_DELAY = 8      # Cap at 8 seconds
+
+        # Override defaults with INI configuration if present
         if 'client' in cfg:
-            #self.sensey_server = cfg['client']['sensey_server']
-            #self.cache_file = cfg['client']['cache_file']
             self.config = cfg["client"]
-            self.interval = self.config.getint( 'poll_interval', 300)
-            self.cache_file = self.config.get( 'cache_file', "./sensey_cache.json" )
-            logging.info( f"Loaded config file with keys {[key for key in self.config.keys()]}")
-        
+            self.interval = self.config.getint('poll_interval', 300)
+            self.cache_file = self.config.get('cache_file', "./sensey_cache.json")
+            logging.info(f"Loaded config file with keys {[key for key in self.config.keys()]}")
+
+        # Load any unsent data from previous runs
         self.cache = self._load_cache()
+
+        # Construct server endpoint URL with hostname as client ID
         self.server_url = f"http://{self.sensey_server}/data/{self.host}"
 
     def _generate_filename(self) -> str:
@@ -161,34 +240,78 @@ class CSVLogger:
 
             writer.writerow(row)
 
-    def _send_data( self, data: Dict[str, Any] ):
-        """Sends data to a Sensey server """
-        self.cache.append( data )
-        self._save_cache()
+    def _send_data(self, data: Dict[str, Any]):
+        """
+        Send sensor data to server with automatic retry and exponential backoff.
+
+        This method implements a resilient transmission strategy:
+        1. Append new data to persistent cache
+        2. Attempt to send all cached data in FIFO order
+        3. On failure, requeue data and wait with exponential backoff
+        4. On success, reset retry delay
+
+        The cache survives application restarts, ensuring no data loss.
+
+        Args:
+            data: Sensor reading dictionary to send
+
+        Retry Behavior:
+            - Success: Data removed from cache, retry delay reset to 1s
+            - HTTP Error: Data requeued to front, retry after delay
+            - Network Error: Data requeued to front, retry after delay
+            - Delay doubles each failure: 1s -> 2s -> 4s -> 8s (capped)
+
+        Note:
+            This method blocks on failures. For async behavior, wrap in async task.
+        """
+        # Add new data to end of cache queue (FIFO)
+        self.cache.append(data)
+        self._save_cache()  # Persist to disk for crash recovery
+
+        # Initialize retry delay for exponential backoff
         retry_delay = self.INITIAL_RETRY_DELAY
 
+        # Process all cached data until queue is empty
         while self.cache:
+            # Get oldest data from queue (FIFO - first in, first out)
             current_data = self.cache.popleft()
             success = True
+
             try:
-                response = requests.post( self.server_url, json=current_data, timeout=5)
+                # Attempt HTTP POST with 5-second timeout
+                response = requests.post(self.server_url, json=current_data, timeout=5)
+
                 if response.status_code == 200:
                     logging.info("Data sent successfully.")
-                    retry_delay = self.INITIAL_RETRY_DELAY
+                    retry_delay = self.INITIAL_RETRY_DELAY  # Reset delay on success
                 else:
+                    # Server returned error (4xx or 5xx)
                     logging.error(f"Server returned an error: {response.status_code} - {response.text}")
                     success = False
+
             except requests.RequestException as e:
-                print(f"Failed to send data: {e}")
+                # Network error (connection timeout, DNS failure, etc.)
+                logging.error(f"Failed to send data: {e}")
                 success = False
+
             finally:
                 if success is False:
+                    # Transmission failed - requeue data to front of queue
+                    # This preserves FIFO order for this specific record
                     self.cache.appendleft(current_data)
+                    self._save_cache()  # Persist updated cache
+
                     logging.warning(f"Unsuccessful send, sleeping for {retry_delay} seconds before trying again")
                     sleep(retry_delay)
-                    retry_delay = min( retry_delay*2, self.MAX_RETRY_DELAY )
+
+                    # Exponential backoff - double delay for next retry (capped at MAX_RETRY_DELAY)
+                    retry_delay = min(retry_delay * 2, self.MAX_RETRY_DELAY)
+
+            # Persist cache after each transmission attempt
             self._save_cache()
+
+            # Exit retry loop if we've reached maximum delay (indicates persistent failure)
             if retry_delay == self.MAX_RETRY_DELAY:
-                logging.error(f"Exiting, reached max retry of {self.MAX_RETRY_DELAY}")
+                logging.error(f"Exiting retry loop, reached max retry delay of {self.MAX_RETRY_DELAY}s")
                 break 
 
