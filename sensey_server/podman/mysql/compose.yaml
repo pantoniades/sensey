@@ -1,0 +1,49 @@
+# Podman Compose configuration for Sensey Server with MySQL storage
+# Compatible with both podman-compose and docker-compose
+#
+# NOTE: This configuration assumes you have an external MySQL server.
+# Update sensey.ini with your MySQL connection details.
+
+services:
+  sensey-server:
+    image: localhost/sensey-server:latest
+    container_name: sensey-server-mysql
+
+    ports:
+      - "5000:5000"
+
+    volumes:
+      # Mount configuration (read-only)
+      - ./sensey.ini:/app/sensey.ini:ro,Z
+
+    # Podman secrets for MySQL password (recommended)
+    # Create secret first: echo "your_password" | podman secret create sensey_mysql_password -
+    # Then uncomment the lines below:
+    # secrets:
+    #   - sensey_mysql_password
+
+    # Alternative: Use environment variable (less secure, commented out)
+    # environment:
+    #   - SENSEY_MYSQL_PASSWORD=your_password_here
+
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health').read()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits (optional, adjust as needed)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 512M
+
+# Podman secrets configuration (uncomment if using secrets)
+# secrets:
+#   sensey_mysql_password:
+#     external: true

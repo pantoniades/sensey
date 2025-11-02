@@ -102,6 +102,23 @@ def receive_data(client_id):
         logger.error(f"Error processing data from {client_id}: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+@app.route("/health")
+def health():
+    """
+    Health check endpoint for container orchestration and monitoring.
+
+    Returns 200 OK if the application is running and storage is accessible.
+    Used by Podman/Docker HEALTHCHECK and monitoring tools.
+    """
+    try:
+        # Verify storage is accessible by checking for clients
+        # This is a lightweight check that exercises the storage layer
+        _ = sensey_data.get_available_clients()
+        return jsonify({"status": "healthy", "storage": "accessible"}), 200
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({"status": "unhealthy", "error": str(e)}), 503
+
 @app.route("/")
 def index():
     """Show a dropdown to select a client and display charts for the selected client."""

@@ -1,0 +1,56 @@
+# Sensey Server - Container Build Exclusions
+
+# Virtual environments
+.venv/
+venv/
+env/
+bin/
+lib/
+lib64
+include/
+share/
+pyvenv.cfg
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing
+.pytest_cache/
+tests/
+pytest.ini
+.coverage
+htmlcov/
+
+# Data and logs (should be mounted as volumes)
+data/*
+*.log
+
+# Configuration (should be mounted at runtime)
+sensey.ini
+
+# Development files
+*.ipynb
+.ipynb_checkpoints/
+plot_tests.ipynb
+
+# Podman deployment configs (not needed in image)
+podman/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

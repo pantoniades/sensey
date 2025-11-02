@@ -1,0 +1,25 @@
+[Unit]
+Description=Sensey Server (Podman Container)
+Documentation=https://github.com/yourusername/sensey
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+TimeoutStartSec=90
+TimeoutStopSec=30
+
+# Environment
+Environment=PODMAN_SYSTEMD_UNIT=%n
+
+# Start command - container will be created with --restart unless-stopped
+ExecStart=/usr/bin/podman start -a sensey-server-csv
+ExecStop=/usr/bin/podman stop -t 10 sensey-server-csv
+
+# Cleanup on service stop
+ExecStopPost=/usr/bin/podman rm -f sensey-server-csv
+
+[Install]
+WantedBy=multi-user.target

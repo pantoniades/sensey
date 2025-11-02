@@ -18,6 +18,7 @@ Sensey consists of two main components:
 - 🧪 **Comprehensive Testing**: 40+ tests with pytest
 - ⚙️ **Configuration-Driven**: INI-based configuration with validation
 - 🚀 **Production Ready**: Systemd service files and installation scripts included
+- 🐳 **Containerized Deployment**: Podman/Docker support with secrets management
 
 ## Quick Start
 
@@ -50,6 +51,7 @@ Server runs at http://localhost:5000
 
 ### Production Deployment (Raspberry Pi)
 
+**Native systemd deployment:**
 ```bash
 # Install server
 ./install-server.sh
@@ -63,6 +65,41 @@ sudo systemctl start sensey-server
 ./manage-services.sh status all
 ./manage-services.sh logs server
 ```
+
+### Containerized Deployment (Podman)
+
+**For portable, containerized server deployment:**
+
+```bash
+# CSV storage (simple, file-based)
+./install-server-podman.sh --csv
+
+# MySQL storage (production, external database)
+./install-server-podman.sh --mysql
+```
+
+**Features:**
+- 🐳 **Portable**: Run anywhere Podman/Docker is available
+- 🔒 **Isolated**: No conflicts with system packages
+- 🔑 **Secure**: Podman secrets for password management
+- 📦 **Self-contained**: All dependencies bundled in image
+
+**Management:**
+```bash
+# Using Podman directly
+podman ps                              # View containers
+podman logs -f sensey-server-csv       # View logs
+podman restart sensey-server-mysql     # Restart
+
+# Using manage-services.sh
+./manage-services.sh status server-podman-csv
+./manage-services.sh logs server-podman-mysql
+./manage-services.sh restart server-podman-csv
+```
+
+**Documentation:** See [sensey_server/podman/README.md](sensey_server/podman/README.md) for complete Podman deployment guide.
+
+**Note:** Clients always run natively on edge devices (not containerized) for hardware sensor access.
 
 ## Architecture
 
@@ -142,6 +179,11 @@ pool_size = 5
 - Use `sensey.ini.example` as template
 - Environment variable override: `SENSEY_CONFIG_PATH`
 
+**Podman/Container Secrets (MySQL only):**
+- `SENSEY_MYSQL_PASSWORD` - Direct environment variable
+- `SENSEY_MYSQL_PASSWORD_FILE` - Path to secret file (Podman secrets)
+- Priority: ENV VAR > SECRET FILE > CONFIG FILE
+
 ### Client Configuration (sensey.ini)
 
 Located in `sensey_client/sensey.ini`:
@@ -180,6 +222,28 @@ Receive sensor data from a client.
 ### GET /
 
 Dashboard showing available clients and client selector.
+
+### GET /health
+
+Health check endpoint for monitoring and container orchestration.
+
+**Response (healthy):**
+```json
+{
+  "status": "healthy",
+  "storage": "accessible"
+}
+```
+
+**Response (unhealthy):** HTTP 503
+```json
+{
+  "status": "unhealthy",
+  "error": "error details"
+}
+```
+
+Used by Podman/Docker HEALTHCHECK and monitoring tools.
 
 ### GET /charts/\<client_id\>?range=\<timerange\>
 

@@ -144,6 +144,30 @@ to your configuration file.
 
         logger.info(f"Configuration validated successfully (backend: {backend})")
 
+    def _read_secret_file(self, env_var_name: str) -> Optional[str]:
+        """
+        Read secret from a file path specified in an environment variable.
+
+        Used for Podman/Docker secrets which are mounted as files.
+
+        Args:
+            env_var_name: Name of environment variable containing file path
+
+        Returns:
+            Secret content if file exists and is readable, None otherwise
+        """
+        secret_file_path = os.environ.get(env_var_name)
+        if not secret_file_path:
+            return None
+
+        try:
+            with open(secret_file_path, 'r') as f:
+                # Read and strip whitespace/newlines
+                return f.read().strip()
+        except (FileNotFoundError, PermissionError, IOError) as e:
+            logger.warning(f"Failed to read secret from {secret_file_path}: {e}")
+            return None
+
     def _validate_csv_config(self):
         """
         Validate CSV storage configuration.
@@ -164,6 +188,11 @@ to your configuration file.
     def _validate_mysql_config(self):
         """
         Validate MySQL storage configuration.
+
+        Password can be provided via:
+        1. Environment variable: SENSEY_MYSQL_PASSWORD (highest priority)
+        2. Config file: sensey.ini [mysql] password field
+        3. Podman secret file: SENSEY_MYSQL_PASSWORD_FILE
 
         Raises:
             ConfigurationError: If MySQL configuration is invalid or incomplete
@@ -204,9 +233,17 @@ to your configuration file.
             except ValueError as e:
                 raise ConfigurationError(f"Invalid MySQL pool_size: {e}")
 
-        # Warn if password is empty (not an error, but worth noting)
-        if not self.config['mysql'].get('password'):
-            logger.warning("MySQL password is empty - connecting without password")
+        # Check password availability from various sources
+        password_from_env = os.environ.get('SENSEY_MYSQL_PASSWORD')
+        password_from_file = self._read_secret_file('SENSEY_MYSQL_PASSWORD_FILE')
+        password_from_config = self.config['mysql'].get('password')
+
+        if not any([password_from_env, password_from_file, password_from_config]):
+            logger.warning(
+                "MySQL password not found in environment (SENSEY_MYSQL_PASSWORD), "
+                "secret file (SENSEY_MYSQL_PASSWORD_FILE), or config file - "
+                "connecting without password"
+            )
 
     def get_storage_backend(self) -> str:
         """
@@ -221,6 +258,12 @@ to your configuration file.
         """
         Get storage backend configuration parameters.
 
+        For MySQL backend, password is resolved with the following priority:
+        1. SENSEY_MYSQL_PASSWORD environment variable (highest priority)
+        2. File specified by SENSEY_MYSQL_PASSWORD_FILE env var (Podman secrets)
+        3. password field in sensey.ini [mysql] section
+        4. Empty string (no password)
+
         Returns:
             Dictionary of configuration parameters for the selected backend
 
@@ -234,11 +277,18 @@ to your configuration file.
                 'data_dir': self.config['csv']['data_dir']
             }
         elif backend == 'mysql':
+            # Resolve password from multiple sources (priority order)
+            password = (
+                os.environ.get('SENSEY_MYSQL_PASSWORD') or  # Environment variable
+                self._read_secret_file('SENSEY_MYSQL_PASSWORD_FILE') or  # Secret file
+                self.config['mysql'].get('password', '')  # Config file
+            )
+
             config = {
                 'host': self.config['mysql']['host'],
                 'port': int(self.config['mysql']['port']),
                 'user': self.config['mysql']['user'],
-                'password': self.config['mysql'].get('password', ''),
+                'password': password,
                 'database': self.config['mysql']['database'],
             }
 
