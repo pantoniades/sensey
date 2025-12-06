@@ -17,7 +17,7 @@ services:
       - ./sensey.ini:/app/sensey.ini:ro,Z
 
     # Podman secrets for MySQL password (recommended)
-    # Create secret first: echo "your_password" | podman secret create sensey_mysql_password -
+    # Create secret first: echo -n "your_password" | podman secret create sensey_mysql_password -
     # Then uncomment the lines below:
     # secrets:
     #   - sensey_mysql_password

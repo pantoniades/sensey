@@ -58,7 +58,7 @@ else
     echo "Choose one of the following methods to provide the password:"
     echo ""
     echo "1. Podman Secret (RECOMMENDED - most secure):"
-    echo "   echo 'your_password' | podman secret create $SECRET_NAME -"
+    echo "   echo -n 'your_password' | podman secret create $SECRET_NAME -"
     echo "   Then run this script again."
     echo ""
     echo "2. Environment Variable:"
@@ -127,7 +127,7 @@ echo "  Edit $SCRIPT_DIR/sensey.ini to update connection settings"
 echo ""
 if [ "$USE_SECRET" = true ]; then
     echo "Password: Using Podman secret '$SECRET_NAME'"
-    echo "  Update: echo 'new_password' | podman secret create ${SECRET_NAME}_new -"
+    echo "  Update: echo -n 'new_password' | podman secret create ${SECRET_NAME}_new -"
 elif [ -n "$SENSEY_MYSQL_PASSWORD" ]; then
     echo "Password: Using environment variable SENSEY_MYSQL_PASSWORD"
 else

@@ -43,7 +43,7 @@ nano sensey_server/podman/mysql/sensey.ini
 # Update: host, port, user, database
 
 # Set password via Podman secret (recommended)
-echo 'your_password' | podman secret create sensey_mysql_password -
+echo -n 'your_password' | podman secret create sensey_mysql_password -
 
 # Restart container
 podman restart sensey-server-mysql

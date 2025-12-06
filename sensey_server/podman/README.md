@@ -152,7 +152,7 @@ Most secure method - password never appears in config files or environment.
 
 ```bash
 # Create secret
-echo 'your_mysql_password' | podman secret create sensey_mysql_password -
+echo -n 'your_mysql_password' | podman secret create sensey_mysql_password -
 
 # Deploy/restart container
 cd sensey_server/podman/mysql
@@ -165,7 +165,7 @@ cd sensey_server/podman/mysql
 podman secret rm sensey_mysql_password
 
 # Create new secret
-echo 'new_password' | podman secret create sensey_mysql_password -
+echo -n 'new_password' | podman secret create sensey_mysql_password -
 
 # Restart container
 podman restart sensey-server-mysql

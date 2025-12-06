@@ -126,7 +126,7 @@ if [ "$DEPLOYMENT_TYPE" = "mysql" ]; then
     echo "2. Set MySQL password (choose one method):"
     echo ""
     echo "   a) Podman Secret (RECOMMENDED):"
-    echo "      echo 'your_password' | podman secret create sensey_mysql_password -"
+    echo "      echo -n 'your_password' | podman secret create sensey_mysql_password -"
     echo "      podman restart sensey-server-mysql"
     echo ""
     echo "   b) Environment Variable:"
