@@ -33,6 +33,7 @@ COPY --from=builder --chown=sensey:sensey /root/.local /home/sensey/.local
 COPY --chown=sensey:sensey app.py .
 COPY --chown=sensey:sensey config.py .
 COPY --chown=sensey:sensey sensey_data.py .
+COPY --chown=sensey:sensey ecowitt.py .
 COPY --chown=sensey:sensey storage/ storage/
 COPY --chown=sensey:sensey templates/ templates/
 
