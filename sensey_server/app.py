@@ -36,6 +36,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import atexit
+import configparser
 from flask import Flask, jsonify, request, render_template
 import logging
 import sensey_data  # Data handling module
@@ -75,6 +76,28 @@ except Exception as e:
     logger.critical("Please check sensey.ini configuration and try again")
     # Let the exception propagate - app should not start without storage
     raise
+
+# Load full config for optional integrations
+# TODO: Refactor to use config.py module for all configuration
+config_parser = configparser.ConfigParser()
+config_parser.read('sensey.ini')
+
+# Get global system units setting (defaults to metric)
+system_units = config_parser.get('server', 'system_units', fallback='metric')
+logger.info(f"System units: {system_units}")
+
+# Conditionally load Ecowitt integration
+if 'ecowitt' in config_parser and config_parser['ecowitt'].getboolean('enabled', False):
+    logger.info("Loading Ecowitt integration...")
+    try:
+        from ecowitt import register_routes as register_ecowitt_routes
+        register_ecowitt_routes(app, config_parser['ecowitt'], system_units)
+        logger.info("Ecowitt integration enabled")
+    except Exception as e:
+        logger.error(f"Failed to load Ecowitt integration: {e}", exc_info=True)
+        raise
+else:
+    logger.info("Ecowitt integration disabled (set enabled=true in [ecowitt] section to enable)")
 
 # Register shutdown handler to close storage cleanly
 @atexit.register

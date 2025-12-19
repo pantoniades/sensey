@@ -115,6 +115,7 @@ sudo systemctl start sensey-server
 ### Server Architecture
 - **Flask Routes**:
   - `POST /data/<client_id>` - Receives sensor data from clients
+  - `POST /ecowitt` - Receives data from Ecowitt weather stations (optional, configurable)
   - `GET /` - Dashboard showing available clients
   - `GET /charts/<client_id>` - Interactive Plotly charts for client data
 - **Storage Abstraction Layer** (`storage/` package):
@@ -127,6 +128,11 @@ sudo systemctl start sensey-server
   - **Easy extensibility**: Add PostgreSQL, InfluxDB, etc. by implementing `SenseyStorage`
 - **Configuration**: `config.py` loads and validates `sensey.ini` with fail-fast behavior
 - **Data Access**: `sensey_data.py` provides backward-compatible API wrapping storage backends
+- **Ecowitt Integration** (`ecowitt.py`): Optional module for receiving data from Ecowitt weather stations
+  - Supports GW3000, GW1000, GW1100, GW2000 and compatible devices
+  - Receives data via Custom Server / Custom Push feature
+  - Auto-converts imperial units (°F, inHg, mph, inches) to metric based on system_units setting
+  - Disabled by default, enabled via `sensey.ini` configuration
 
 ### Key Design Patterns
 - **Plugin Architecture**:
@@ -144,9 +150,15 @@ sudo systemctl start sensey-server
 ### Configuration
 
 #### Server Configuration (`sensey_server/sensey.ini`)
+- **System Units**: Global unit preference (`metric` or `imperial`, default: `metric`)
 - **Storage Backend**: Choose between CSV or MySQL
 - **CSV Settings**: Data directory path (default: `data/`)
 - **MySQL Settings**: Host, port, user, password, database, connection pool size
+- **Ecowitt Integration** (optional):
+  - `enabled`: Enable/disable Ecowitt weather station integration (default: `false`)
+  - `url`: Custom endpoint URL (default: `/ecowitt`)
+  - `client_name`: Friendly name for dashboard (default: uses device PASSKEY)
+  - Configure GW3000 Custom Server to push to: `http://your-server:5000/ecowitt`
 - **Validation**: Application fails fast if `sensey.ini` is missing or invalid
 - **Template**: Use `sensey.ini.example` as starting point
 - **Environment Override**: `SENSEY_CONFIG_PATH` can specify alternate config location
@@ -158,3 +170,34 @@ sudo systemctl start sensey-server
 #### Data Retention
 - Time range selectable in UI (1h, 6h, 1d, 3d, 7d, all)
 - Storage backend handles time-based filtering efficiently
+
+## TODO / Future Work
+
+### Data Model Refactoring (HIGH PRIORITY)
+- **Issue**: Currently MySQL uses hybrid schema (dedicated temp/humidity columns + JSON for other sensors)
+- **Goal**: Consolidate to single unified table structure across all storage backends
+- **Options**:
+  - All sensors stored in JSON column (flexible but slower queries)
+  - Normalized `sensor_readings` table with sensor_type, value columns
+  - Wide table with common columns for all sensor types
+- **Impact**: Breaking change, requires migration script
+
+### Global Settings Expansion
+- **Current**: Only `system_units` in `[server]` section
+- **Needed**:
+  - `host` - Server bind address (default: 0.0.0.0)
+  - `port` - Server port (default: 5000)
+  - `debug` - Debug mode flag
+  - `log_level` - Logging verbosity (DEBUG, INFO, WARNING, ERROR)
+  - Centralized configuration management via `config.py`
+
+### Ecowitt Enhancements
+- **Multi-device support**: Map PASSKEY to friendly names (e.g., `{"ABC123": "backyard", "DEF456": "frontyard"}`)
+- **Additional sensor fields**: Soil moisture, extra temp sensors (temp1f-temp8f), lightning detection
+- **Battery monitoring**: Alert/display battery levels for wireless sensors
+- **Data validation**: Bounds checking and anomaly detection
+
+### Web UI Improvements
+- **Client labeling**: Edit client names through web UI instead of config file
+- **Unit display**: Show units on charts based on system_units setting
+- **Settings page**: Configure server settings via web interface

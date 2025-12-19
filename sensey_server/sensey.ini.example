@@ -1,7 +1,21 @@
 # Sensey Server Configuration
 # Copy this file to sensey.ini and configure for your environment
 
+[server]
+# TODO: This section should be expanded to include global server settings
+# Future: port, host, debug mode, logging level, etc.
+
+# System-wide unit preference for all sensors
+# metric: °C, hPa, m/s, mm
+# imperial: °F, inHg, mph, inches
+# Note: Existing sensors (garden, sensehat) use metric
+system_units = metric
+
 [storage]
+# TODO: Data model needs refactoring
+# Currently MySQL uses hybrid schema (temp/humidity columns + JSON)
+# Should move to single unified table with consistent schema across backends
+# Consider: all sensors in JSON, or normalized sensor_readings table
 # Storage backend type: csv or mysql
 # csv: Simple file-based storage (no additional dependencies)
 # mysql: Database storage (requires mysql-connector-python and MySQL 8.4+)
@@ -27,3 +41,22 @@ database = sensey
 # Connection pool size (number of persistent connections)
 # Adjust based on expected concurrent client connections
 pool_size = 5
+
+[ecowitt]
+# Ecowitt weather station integration (GW3000, GW1000, etc.)
+# Enable to receive data from Ecowitt devices via Custom Server feature
+
+# Enable/disable Ecowitt integration
+enabled = false
+
+# URL endpoint for receiving Ecowitt data (without leading slash)
+# Configure your GW3000 Custom Server to: http://your-server:5000/ecowitt
+url = /ecowitt
+
+# Client name that appears in the dashboard
+# If not specified, uses device PASSKEY as identifier
+# Examples: backyard-weather, weather-station, ecowitt-gw3000
+client_name = ecowitt-weather
+
+# TODO: Support multiple devices with PASSKEY mapping
+# passkey_map = {"ABC123": "backyard", "DEF456": "frontyard"}

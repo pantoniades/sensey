@@ -8,6 +8,7 @@ Sensey consists of two main components:
 
 - **sensey_server**: Flask web server that receives, stores, and visualizes sensor data
 - **sensey_client**: Raspberry Pi client applications that collect sensor data and transmit to the server
+- **Ecowitt Integration**: Optional support for Ecowitt weather stations (GW3000, GW1000, etc.)
 
 ### Key Features
 
@@ -15,6 +16,7 @@ Sensey consists of two main components:
 - 🔄 **Resilient Communication**: Automatic retry with exponential backoff and local caching
 - 📈 **Interactive Visualizations**: Real-time Plotly charts with configurable time ranges
 - 🔌 **Sensor Abstraction**: Easy to add new sensor types via plugin architecture
+- 🌦️ **Weather Station Support**: Optional Ecowitt GW3000/GW1000 integration with auto unit conversion
 - 🧪 **Comprehensive Testing**: 40+ tests with pytest
 - ⚙️ **Configuration-Driven**: INI-based configuration with validation
 - 🚀 **Production Ready**: Systemd service files and installation scripts included
@@ -110,6 +112,7 @@ sensey_server/
 ├── app.py              # Flask application entry point
 ├── config.py           # Configuration loader with validation
 ├── sensey_data.py      # Backward-compatible data access layer
+├── ecowitt.py          # Ecowitt weather station integration (optional)
 ├── storage/            # Pluggable storage backends
 │   ├── base.py         # Abstract base class
 │   ├── csv_storage.py  # CSV file storage
@@ -156,6 +159,10 @@ sensey_client/
 Located in `sensey_server/sensey.ini`:
 
 ```ini
+[server]
+# System-wide unit preference (metric or imperial)
+system_units = metric
+
 [storage]
 # Storage backend: csv or mysql
 backend = csv
@@ -172,6 +179,12 @@ user = sensey
 password =
 database = sensey
 pool_size = 5
+
+[ecowitt]
+# Ecowitt weather station integration (optional)
+enabled = false
+url = /ecowitt
+client_name = ecowitt-weather
 ```
 
 **Configuration Rules:**
@@ -218,6 +231,32 @@ Receive sensor data from a client.
   "status": "success"
 }
 ```
+
+### POST /ecowitt
+
+Receive data from Ecowitt weather stations (optional, configurable).
+
+**Protocol:** HTTP POST with form-encoded data (imperial units)
+**Auto-converts** to metric if `system_units=metric`
+
+**Supported fields:**
+- Outdoor: `tempf`, `humidity`, `baromrelin`
+- Wind: `windspeedmph`, `winddir`, `windgustmph`
+- Solar: `solarradiation`, `uv`
+- Rain: `rainratein`, `dailyrainin`
+- Indoor: `tempinf`, `humidityin` (optional)
+
+**Response:** `"success"` (HTTP 200)
+
+**Configuration:** Enable in `sensey.ini`:
+```ini
+[ecowitt]
+enabled = true
+url = /ecowitt
+client_name = backyard-weather
+```
+
+Configure GW3000 Custom Server to: `http://your-server:5000/ecowitt`
 
 ### GET /
 
@@ -285,6 +324,7 @@ See [sensey_server/tests/README.md](sensey_server/tests/README.md) for detailed 
 | Soil Moisture | Generic analog | Voltage, % | SPI/ADC |
 | Raspberry Pi Sense HAT | All sensors | Temp, humidity, pressure, etc. | Built-in |
 | Pimoroni Enviro+ | All sensors | Temp, humidity, pressure, gas, PM | I2C |
+| **Weather Stations** | **Ecowitt GW3000/GW1000/GW1100/GW2000** | **Temp, humidity, pressure, wind, rain, solar, UV** | **HTTP (Custom Server)** |
 
 ### Adding New Sensors
 
@@ -443,9 +483,20 @@ Built with:
 
 ## Roadmap
 
+### High Priority
+- [ ] **Data model refactoring**: Consolidate to single unified table (MySQL hybrid schema → normalized structure)
+- [ ] **Global settings expansion**: Add server section for host, port, debug, log_level
+- [ ] **Web UI for client labeling**: Edit client names through web interface
+
+### Ecowitt Enhancements
+- [ ] Multi-device PASSKEY mapping
+- [ ] Additional sensor fields (soil moisture, extra temp sensors, lightning)
+- [ ] Battery level monitoring and alerts
+- [ ] Data validation and bounds checking
+
+### Future Features
 - [ ] PostgreSQL storage backend
 - [ ] InfluxDB time-series storage backend
-- [ ] Web-based configuration UI
 - [ ] Email/SMS alerts for sensor thresholds
 - [ ] Mobile app for monitoring
 - [ ] Historical data export (CSV, JSON, Excel)
