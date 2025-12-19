@@ -36,6 +36,7 @@ COPY --chown=sensey:sensey sensey_data.py .
 COPY --chown=sensey:sensey ecowitt.py .
 COPY --chown=sensey:sensey storage/ storage/
 COPY --chown=sensey:sensey templates/ templates/
+COPY --chown=sensey:sensey static/ static/
 
 # Set environment variables
 ENV PATH=/home/sensey/.local/bin:$PATH \

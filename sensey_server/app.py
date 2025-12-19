@@ -31,6 +31,8 @@ Environment Variables:
     SENSEY_CONFIG_PATH: Override path to sensey.ini (optional)
 """
 
+__version__ = "0.3.0"  # Version: 0.3.0 - Ecowitt integration, podman deployment
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -151,7 +153,7 @@ def index():
         return "<h2>No data available.</h2>"
 
     # Default to first client if none is selected
-    return render_template("index.html", clients=clients)
+    return render_template("index.html", clients=clients, version=__version__, system_units=system_units)
 
 @app.route("/charts/<client_id>")
 def display_charts_for_client(client_id):
