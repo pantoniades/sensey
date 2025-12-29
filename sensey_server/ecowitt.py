@@ -173,6 +173,11 @@ def _parse_ecowitt_data(raw_data: Dict[str, str], convert_to_metric: bool) -> Di
         gust = float(raw_data['windgustmph'])
         sensor_data['wind_gust'] = _mph_to_ms(gust) if convert_to_metric else gust
 
+    # Max daily gust
+    if 'maxdailygust' in raw_data:
+        max_gust = float(raw_data['maxdailygust'])
+        sensor_data['wind_gust_max_daily'] = _mph_to_ms(max_gust) if convert_to_metric else max_gust
+
     # Solar radiation
     if 'solarradiation' in raw_data:
         sensor_data['solar_radiation'] = float(raw_data['solarradiation'])
@@ -181,15 +186,45 @@ def _parse_ecowitt_data(raw_data: Dict[str, str], convert_to_metric: bool) -> Di
     if 'uv' in raw_data:
         sensor_data['uv_index'] = float(raw_data['uv'])
 
-    # Rain rate
+    # Rain rate (traditional rain gauge)
     if 'rainratein' in raw_data:
         rate = float(raw_data['rainratein'])
         sensor_data['rain_rate'] = _inches_to_mm(rate) if convert_to_metric else rate
 
-    # Daily rain
+    # Rain rate (piezo rain sensor)
+    if 'rrain_piezo' in raw_data:
+        rate = float(raw_data['rrain_piezo'])
+        sensor_data['rain_rate'] = _inches_to_mm(rate) if convert_to_metric else rate
+
+    # Daily rain (traditional rain gauge)
     if 'dailyrainin' in raw_data:
         rain = float(raw_data['dailyrainin'])
         sensor_data['rain_daily'] = _inches_to_mm(rain) if convert_to_metric else rain
+
+    # Daily rain (piezo rain sensor)
+    if 'drain_piezo' in raw_data:
+        rain = float(raw_data['drain_piezo'])
+        sensor_data['rain_daily'] = _inches_to_mm(rain) if convert_to_metric else rain
+
+    # Hourly rain (piezo)
+    if 'hrain_piezo' in raw_data:
+        rain = float(raw_data['hrain_piezo'])
+        sensor_data['rain_hourly'] = _inches_to_mm(rain) if convert_to_metric else rain
+
+    # Weekly rain (piezo)
+    if 'wrain_piezo' in raw_data:
+        rain = float(raw_data['wrain_piezo'])
+        sensor_data['rain_weekly'] = _inches_to_mm(rain) if convert_to_metric else rain
+
+    # Monthly rain (piezo)
+    if 'mrain_piezo' in raw_data:
+        rain = float(raw_data['mrain_piezo'])
+        sensor_data['rain_monthly'] = _inches_to_mm(rain) if convert_to_metric else rain
+
+    # Yearly rain (piezo)
+    if 'yrain_piezo' in raw_data:
+        rain = float(raw_data['yrain_piezo'])
+        sensor_data['rain_yearly'] = _inches_to_mm(rain) if convert_to_metric else rain
 
     # Indoor temperature (optional)
     if 'tempinf' in raw_data:
@@ -205,12 +240,20 @@ def _parse_ecowitt_data(raw_data: Dict[str, str], convert_to_metric: bool) -> Di
         pressure_abs = float(raw_data['baromabsin'])
         sensor_data['pressure_absolute'] = _inhg_to_hpa(pressure_abs) if convert_to_metric else pressure_abs
 
+    # Battery voltage (WH90 sensor)
+    if 'wh90batt' in raw_data:
+        sensor_data['battery_wh90'] = float(raw_data['wh90batt'])
+
+    # Battery voltage (WH65 sensor)
+    if 'wh65batt' in raw_data:
+        sensor_data['battery_wh65'] = float(raw_data['wh65batt'])
+
     # TODO: Add more fields as needed
-    # - Battery levels (wh65batt, etc.)
-    # - Additional rain totals (weekly, monthly, yearly)
-    # - Max daily gust
-    # - Soil moisture sensors
-    # - Additional temperature sensors (temp1f, temp2f, etc.)
+    # - Soil moisture sensors (soilmoisture1-8)
+    # - Additional temperature sensors (temp1f-temp8f)
+    # - Additional humidity sensors (humidity1-8)
+    # - PM2.5 air quality sensors
+    # - Lightning detection
 
     return sensor_data
 
